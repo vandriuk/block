@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Облік виробництва шлакоблоків</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // ========== НАЛАШТУВАННЯ FIREBASE ==========
+        // ЗАМІНІТЬ ЦІ ЗНАЧЕННЯ НА ВАШІ З FIREBASE CONSOLE
+        // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBal2IiMwq97gBRfODesYVtRDHmBfQTWsY",
+  authDomain: "shlakoblock-ebf35.firebaseapp.com",
+  projectId: "shlakoblock-ebf35",
+  storageBucket: "shlakoblock-ebf35.firebasestorage.app",
+  messagingSenderId: "198560932701",
+  appId: "1:198560932701:web:5f1b278f4be868cb087eb4"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+        
+        // Ініціалізація Firebase
+        let app, auth, db;
+        try {
+            app = firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+            db = firebase.firestore();
+        } catch (error) {
+            console.error("Firebase не налаштовано. Перегляньте інструкцію.", error);
+        }
+        
+        // Іконки (такі ж як раніше)
+        const Plus = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+        );
+        
+        const Trash2 = () => (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+        );
+        
+        const Package = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line>
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+            </svg>
+        );
+        
+        const Factory = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"></path>
+                <path d="M17 18h1"></path>
+                <path d="M12 18h1"></path>
+                <path d="M7 18h1"></path>
+            </svg>
+        );
+        
+        const ShoppingCart = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="9" cy="21" r="1"></circle>
+                <circle cx="20" cy="21" r="1"></circle>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
+        );
+        
+        const DollarSign = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="1" x2="12" y2="23"></line>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+            </svg>
+        );
+        
+        const BarChart3 = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 3v18h18"></path>
+                <path d="M18 17V9"></path>
+                <path d="M13 17V5"></path>
+                <path d="M8 17v-3"></path>
+            </svg>
+        );
+        
+        const AlertCircle = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+        );
+        
+        const Users = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+        );
+        
+        const LogOut = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+        );
+
+        // Компонент авторизації
+        const LoginScreen = ({ onLogin }) => {
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                setError('');
+                setLoading(true);
+
+                try {
+                    await auth.signInWithEmailAndPassword(email, password);
+                } catch (error) {
+                    setError('Невірний email або пароль');
+                    console.error(error);
+                }
+                setLoading(false);
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full">
+                        <div className="text-center mb-8">
+                            <h1 className="text-3xl font-bold text-gray-900 mb-2">Облік виробництва</h1>
+                            <p className="text-gray-600">Увійдіть до системи</p>
+                        </div>
+
+                        <form onSubmit={handleLogin} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="your@email.com"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Пароль</label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="••••••••"
+                                    required
+                                />
+                            </div>
+
+                            {error && (
+                                <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
+                                    {error}
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+                            >
+                                {loading ? 'Вхід...' : 'Увійти'}
+                            </button>
+                        </form>
+
+                        <div className="mt-6 text-center text-sm text-gray-600">
+                            <p>Тестові акаунти:</p>
+                            <p className="mt-2">Адмін: admin@example.com / admin123</p>
+                            <p>Менеджер: manager@example.com / manager123</p>
+                            <p>Працівник: worker@example.com / worker123</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const CinderBlockProduction = () => {
+            const [user, setUser] = useState(null);
+            const [userRole, setUserRole] = useState(null);
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [inventory, setInventory] = useState([]);
+            const [production, setProduction] = useState([]);
+            const [sales, setSales] = useState([]);
+            const [expenses, setExpenses] = useState([]);
+            const [users, setUsers] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            // Перевірка авторизації
+            useEffect(() => {
+                const unsubscribe = auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        setUser(user);
+                        // Отримати роль користувача
+                        const userDoc = await db.collection('users').doc(user.uid).get();
+                        if (userDoc.exists) {
+                            setUserRole(userDoc.data().role);
+                        }
+                    } else {
+                        setUser(null);
+                        setUserRole(null);
+                    }
+                    setLoading(false);
+                });
+
+                return () => unsubscribe();
+            }, []);
+
+            // Завантаження даних з Firebase
+            useEffect(() => {
+                if (!user) return;
+
+                const unsubscribers = [];
+
+                // Склад
+                unsubscribers.push(
+                    db.collection('inventory').orderBy('id').onSnapshot((snapshot) => {
+                        const items = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
+                        setInventory(items);
+                    })
+                );
+
+                // Виробництво
+                unsubscribers.push(
+                    db.collection('production').orderBy('date', 'desc').onSnapshot((snapshot) => {
+                        const items = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
+                        setProduction(items);
+                    })
+                );
+
+                // Продажі
+                unsubscribers.push(
+                    db.collection('sales').orderBy('date', 'desc').onSnapshot((snapshot) => {
+                        const items = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
+                        setSales(items);
+                    })
+                );
+
+                // Витрати
+                unsubscribers.push(
+                    db.collection('expenses').orderBy('date', 'desc').onSnapshot((snapshot) => {
+                        const items = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
+                        setExpenses(items);
+                    })
+                );
+
+                // Користувачі (тільки для адміна)
+                if (userRole === 'admin') {
+                    unsubscribers.push(
+                        db.collection('users').onSnapshot((snapshot) => {
+                            const usersList = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+                            setUsers(usersList);
+                        })
+                    );
+                }
+
+                return () => unsubscribers.forEach(unsub => unsub());
+            }, [user, userRole]);
+
+            const handleLogout = async () => {
+                await auth.signOut();
+            };
+
+            // Перевірка прав доступу
+            const canEdit = () => {
+                return userRole === 'admin' || userRole === 'manager';
+            };
+
+            const canViewFinances = () => {
+                return userRole === 'admin' || userRole === 'manager';
+            };
+
+            // Операції зі складом
+            const updateInventory = async (docId, quantity) => {
+                if (!canEdit()) return;
+                await db.collection('inventory').doc(docId).update({
+                    quantity: parseFloat(quantity) || 0
+                });
+            };
+
+            const addInventoryItem = async () => {
+                if (!canEdit()) return;
+                await db.collection('inventory').add({
+                    id: Date.now(),
+                    name: 'Нова сировина',
+                    unit: 'кг',
+                    quantity: 0,
+                    minQuantity: 100,
+                    price: 0
+                });
+            };
+
+            // Операції з виробництвом
+            const addProduction = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                
+                await db.collection('production').add({
+                    id: Date.now(),
+                    date: formData.get('date'),
+                    shift: formData.get('shift'),
+                    blocks: parseInt(formData.get('blocks')),
+                    type: formData.get('type'),
+                    createdBy: user.email,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                e.target.reset();
+            };
+
+            const deleteProduction = async (docId) => {
+                if (!canEdit()) return;
+                await db.collection('production').doc(docId).delete();
+            };
+
+            // Операції з продажами
+            const addSale = async (e) => {
+                e.preventDefault();
+                if (!canEdit()) return;
+                
+                const formData = new FormData(e.target);
+                
+                await db.collection('sales').add({
+                    id: Date.now(),
+                    date: formData.get('saleDate'),
+                    customer: formData.get('customer'),
+                    blocks: parseInt(formData.get('saleBlocks')) || 0,
+                    pallets: parseInt(formData.get('pallets')) || 0,
+                    price: parseFloat(formData.get('price')) || 0,
+                    paid: formData.get('paid') === 'true',
+                    createdBy: user.email,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                e.target.reset();
+            };
+
+            const togglePaid = async (docId, currentStatus) => {
+                if (!canEdit()) return;
+                await db.collection('sales').doc(docId).update({
+                    paid: !currentStatus
+                });
+            };
+
+            const deleteSale = async (docId) => {
+                if (!canEdit()) return;
+                await db.collection('sales').doc(docId).delete();
+            };
+
+            // Операції з витратами
+            const addExpense = async (e) => {
+                e.preventDefault();
+                if (!canEdit()) return;
+                
+                const formData = new FormData(e.target);
+                
+                await db.collection('expenses').add({
+                    id: Date.now(),
+                    date: formData.get('expenseDate'),
+                    category: formData.get('category'),
+                    description: formData.get('description'),
+                    amount: parseFloat(formData.get('amount')),
+                    createdBy: user.email,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                e.target.reset();
+            };
+
+            const deleteExpense = async (docId) => {
+                if (!canEdit()) return;
+                await db.collection('expenses').doc(docId).delete();
+            };
+
+            // Статистика
+            const calculateStats = () => {
+                const totalProduced = production.reduce((sum, p) => sum + p.blocks, 0);
+                const totalSold = sales.reduce((sum, s) => sum + s.blocks, 0);
+                const totalRevenue = sales.filter(s => s.paid).reduce((sum, s) => sum + (s.blocks * s.price), 0);
+                const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+                const totalInventoryValue = inventory.reduce((sum, i) => sum + (i.quantity * i.price), 0);
+                const inStock = totalProduced - totalSold;
+                const profit = totalRevenue - totalExpenses;
+
+                return {
+                    totalProduced,
+                    totalSold,
+                    inStock,
+                    totalRevenue,
+                    totalExpenses,
+                    profit,
+                    totalInventoryValue
+                };
+            };
+
+            if (loading) {
+                return <div className="flex items-center justify-center h-screen">Завантаження...</div>;
+            }
+
+            if (!user) {
+                return <LoginScreen />;
+            }
+
+            const stats = calculateStats();
+
+            // Відображення ролі
+            const getRoleBadge = () => {
+                const roleColors = {
+                    admin: 'bg-purple-100 text-purple-800',
+                    manager: 'bg-blue-100 text-blue-800',
+                    worker: 'bg-green-100 text-green-800'
+                };
+                const roleNames = {
+                    admin: 'Адміністратор',
+                    manager: 'Менеджер',
+                    worker: 'Працівник'
+                };
+                return (
+                    <span className={`px-3 py-1 rounded-full text-sm ${roleColors[userRole]}`}>
+                        {roleNames[userRole]}
+                    </span>
+                );
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50">
+                    {/* Заголовок */}
+                    <div className="bg-blue-600 text-white p-6 shadow-lg">
+                        <div className="max-w-7xl mx-auto flex justify-between items-center">
+                            <div>
+                                <h1 className="text-3xl font-bold">Облік виробництва шлакоблоків</h1>
+                                <p className="text-blue-100 mt-2">Комплексна система управління виробництвом</p>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                                <div className="text-right">
+                                    <p className="text-sm text-blue-100">{user.email}</p>
+                                    {getRoleBadge()}
+                                </div>
+                                <button
+                                    onClick={handleLogout}
+                                    className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-lg flex items-center space-x-2"
+                                >
+                                    <LogOut size={18} />
+                                    <span>Вийти</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Навігація */}
+                    <div className="bg-white shadow-md">
+                        <div className="max-w-7xl mx-auto px-6">
+                            <div className="flex space-x-8 overflow-x-auto">
+                                {[
+                                    { id: 'dashboard', label: 'Дашборд', icon: BarChart3 },
+                                    { id: 'inventory', label: 'Склад', icon: Package },
+                                    { id: 'production', label: 'Виробництво', icon: Factory },
+                                    ...(canViewFinances() ? [{ id: 'sales', label: 'Продажі', icon: ShoppingCart }] : []),
+                                    ...(canViewFinances() ? [{ id: 'expenses', label: 'Витрати', icon: DollarSign }] : []),
+                                    ...(userRole === 'admin' ? [{ id: 'users', label: 'Користувачі', icon: Users }] : [])
+                                ].map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`flex items-center space-x-2 py-4 px-2 border-b-2 transition-colors whitespace-nowrap ${
+                                            activeTab === tab.id
+                                                ? 'border-blue-600 text-blue-600'
+                                                : 'border-transparent text-gray-600 hover:text-gray-900'
+                                        }`}
+                                    >
+                                        <tab.icon size={20} />
+                                        <span className="font-medium">{tab.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Контент */}
+                    <div className="max-w-7xl mx-auto p-6">
+                        {/* Дашборд */}
+                        {activeTab === 'dashboard' && (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="bg-white p-6 rounded-lg shadow">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-gray-600 text-sm">Вироблено блоків</p>
+                                                <p className="text-3xl font-bold text-gray-900">{stats.totalProduced}</p>
+                                            </div>
+                                            <Factory size={40} />
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white p-6 rounded-lg shadow">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-gray-600 text-sm">Продано блоків</p>
+                                                <p className="text-3xl font-bold text-gray-900">{stats.totalSold}</p>
+                                            </div>
+                                            <ShoppingCart size={40} />
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white p-6 rounded-lg shadow">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-gray-600 text-sm">На складі</p>
+                                                <p className="text-3xl font-bold text-gray-900">{stats.inStock}</p>
+                                            </div>
+                                            <Package size={40} />
+                                        </div>
+                                    </div>
+
+                                    {canViewFinances() && (
+                                        <div className="bg-white p-6 rounded-lg shadow">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-gray-600 text-sm">Прибуток</p>
+                                                    <p className={`text-3xl font-bold ${stats.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {stats.profit.toFixed(2)} ₴
+                                                    </p>
+                                                </div>
+                                                <DollarSign size={40} />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {canViewFinances() && (
+                                        <div className="bg-white p-6 rounded-lg shadow">
+                                            <h3 className="text-lg font-bold mb-4">Фінансовий звіт</h3>
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">Дохід (оплачено):</span>
+                                                    <span className="font-bold text-green-600">{stats.totalRevenue.toFixed(2)} ₴</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">Витрати:</span>
+                                                    <span className="font-bold text-red-600">{stats.totalExpenses.toFixed(2)} ₴</span>
+                                                </div>
+                                                <div className="flex justify-between pt-3 border-t">
+                                                    <span className="text-gray-900 font-bold">Прибуток:</span>
+                                                    <span className={`font-bold ${stats.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {stats.profit.toFixed(2)} ₴
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between pt-3 border-t">
+                                                    <span className="text-gray-600">Вартість сировини:</span>
+                                                    <span className="font-bold text-blue-600">{stats.totalInventoryValue.toFixed(2)} ₴</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="bg-white p-6 rounded-lg shadow">
+                                        <h3 className="text-lg font-bold mb-4">Попередження про склад</h3>
+                                        <div className="space-y-2">
+                                            {inventory.filter(item => item.quantity < item.minQuantity).map(item => (
+                                                <div key={item.docId} className="flex items-center space-x-2 p-2 bg-red-50 rounded">
+                                                    <AlertCircle size={20} />
+                                                    <span className="text-red-800">
+                                                        {item.name}: {item.quantity} {item.unit} (мін: {item.minQuantity})
+                                                    </span>
+                                                </div>
+                                            ))}
+                                            {inventory.every(item => item.quantity >= item.minQuantity) && (
+                                                <p className="text-green-600">Всі матеріали в достатній кількості</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Склад сировини */}
+                        {activeTab === 'inventory' && (
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-2xl font-bold">Склад сировини</h2>
+                                    {canEdit() && (
+                                        <button
+                                            onClick={addInventoryItem}
+                                            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700"
+                                        >
+                                            <Plus />
+                                            <span>Додати матеріал</span>
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="bg-white rounded-lg shadow overflow-hidden">
+                                    <table className="w-full">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Назва</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Кількість</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Одиниця</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Мін. кількість</th>
+                                                {canViewFinances() && (
+                                                    <>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ціна за од.</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Вартість</th>
+                                                    </>
+                                                )}
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {inventory.map(item => (
+                                                <tr key={item.docId}>
+                                                    <td className="px-6 py-4">
+                                                        {canEdit() ? (
+                                                            <input
+                                                                type="text"
+                                                                value={item.name}
+                                                                onChange={(e) => {
+                                                                    db.collection('inventory').doc(item.docId).update({ name: e.target.value });
+                                                                }}
+                                                                className="border rounded px-2 py-1 w-full"
+                                                            />
+                                                        ) : (
+                                                            item.name
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {canEdit() ? (
+                                                            <input
+                                                                type="number"
+                                                                value={item.quantity}
+                                                                onChange={(e) => updateInventory(item.docId, e.target.value)}
+                                                                className="border rounded px-2 py-1 w-24"
+                                                            />
+                                                        ) : (
+                                                            item.quantity
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4">{item.unit}</td>
+                                                    <td className="px-6 py-4">{item.minQuantity}</td>
+                                                    {canViewFinances() && (
+                                                        <>
+                                                            <td className="px-6 py-4">{item.price} ₴</td>
+                                                            <td className="px-6 py-4 font-bold">{(item.quantity * item.price).toFixed(2)} ₴</td>
+                                                        </>
+                                                    )}
+                                                    <td className="px-6 py-4">
+                                                        {item.quantity < item.minQuantity ? (
+                                                            <span className="px-2 py-1 bg-red-100 text-red-800 rounded text-sm">Мало</span>
+                                                        ) : (
+                                                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">OK</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Виробництво */}
+                        {activeTab === 'production' && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-bold">Облік виробництва</h2>
+
+                                <div className="bg-white p-6 rounded-lg shadow">
+                                    <h3 className="text-lg font-bold mb-4">Додати виробництво</h3>
+                                    <form onSubmit={addProduction} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                        <input
+                                            type="date"
+                                            name="date"
+                                            defaultValue={new Date().toISOString().split('T')[0]}
+                                            required
+                                            className="border rounded px-3 py-2"
+                                        />
+                                        <select name="shift" required className="border rounded px-3 py-2">
+                                            <option value="Денна">Денна зміна</option>
+                                            <option value="Нічна">Нічна зміна</option>
+                                        </select>
+                                        <input
+                                            type="number"
+                                            name="blocks"
+                                            placeholder="Кількість блоків"
+                                            required
+                                            className="border rounded px-3 py-2"
+                                        />
+                                        <select name="type" required className="border rounded px-3 py-2">
+                                            <option value="Шлакоблок">Шлакоблок</option>
+                                            <option value="Бетоноблок">Бетоноблок</option>
+                                        </select>
+                                        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 md:col-span-4">
+                                            Додати
+                                        </button>
+                                    </form>
+                                </div>
+
+                                <div className="bg-white rounded-lg shadow overflow-hidden">
+                                    <table className="w-full">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Дата</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Зміна</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Кількість</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Тип продукції</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Додав</th>
+                                                {canEdit() && (
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Дії</th>
+                                                )}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {production.map(p => (
+                                                <tr key={p.docId}>
+                                                    <td className="px-6 py-4">{p.date}</td>
+                                                    <td className="px-6 py-4">{p.shift}</td>
+                                                    <td className="px-6 py-4 font-bold">{p.blocks}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-2 py-1 rounded text-sm ${
+                                                            p.type === 'Шлакоблок' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                                                        }`}>
+                                                            {p.type}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{p.createdBy}</td>
+                                                    {canEdit() && (
+                                                        <td className="px-6 py-4">
+                                                            <button
+                                                                onClick={() => deleteProduction(p.docId)}
+                                                                className="text-red-600 hover:text-red-800"
+                                                            >
+                                                                <Trash2 />
+                                                            </button>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Продажі */}
+                        {activeTab === 'sales' && canViewFinances() && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-bold">Продажі та замовлення</h2>
+
+                                {canEdit() && (
+                                    <div className="bg-white p-6 rounded-lg shadow">
+                                        <h3 className="text-lg font-bold mb-4">Додати продаж</h3>
+                                        <form onSubmit={addSale} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <input
+                                                type="date"
+                                                name="saleDate"
+                                                defaultValue={new Date().toISOString().split('T')[0]}
+                                                required
+                                                className="border rounded px-3 py-2"
+                                            />
+                                            <input
+                                                type="text"
+                                                name="customer"
+                                                placeholder="Покупець"
+                                                required
+                                                className="border rounded px-3 py-2"
+                                            />
+                                            <input
+                                                type="number"
+                                                name="saleBlocks"
+                                                placeholder="Кількість блоків"
+                                                required
+                                                className="border rounded px-3 py-2"
+                                            />
+                                            <input
+                                                type="number"
+                                                name="pallets"
+                                                placeholder="Кількість піддонів"
+                                                required
+                                                className="border rounded px-3 py-2"
+                                            />
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                name="price"
+                                                placeholder="Ціна за блок (₴)"
+                                                required
+                                                className="border rounded px-3 py-2"
+                                            />
+                                            <select name="paid" required className="border rounded px-3 py-2">
+                                                <option value="false">Не оплачено</option>
+                                                <option value="true">Оплачено</option>
+                                            </select>
+                                            <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 md:col-span-3">
+                                                Додати продаж
+                                            </button>
+                                        </form>
+                                    </div>
+                                )}
+
+                                <div className="bg-white rounded-lg shadow overflow-hidden">
+                                    <table className="w-full">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Дата</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Покупець</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Блоків</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Піддонів</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ціна</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Всього</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
+                                                {canEdit() && (
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Дії</th>
+                                                )}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {sales.map(s => (
+                                                <tr key={s.docId}>
+                                                    <td className="px-6 py-4">{s.date}</td>
+                                                    <td className="px-6 py-4">{s.customer}</td>
+                                                    <td className="px-6 py-4">{s.blocks}</td>
+                                                    <td className="px-6 py-4 font-medium text-blue-600">{s.pallets || 0}</td>
+                                                    <td className="px-6 py-4">{s.price.toFixed(2)} ₴</td>
+                                                    <td className="px-6 py-4 font-bold">{(s.blocks * s.price).toFixed(2)} ₴</td>
+                                                    <td className="px-6 py-4">
+                                                        <button
+                                                            onClick={() => canEdit() && togglePaid(s.docId, s.paid)}
+                                                            disabled={!canEdit()}
+                                                            className={`px-2 py-1 rounded text-sm ${
+                                                                s.paid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                                            } ${canEdit() ? 'cursor-pointer' : 'cursor-default'}`}
+                                                        >
+                                                            {s.paid ? 'Оплачено' : 'Не оплачено'}
+                                                        </button>
+                                                    </td>
+                                                    {canEdit() && (
+                                                        <td className="px-6 py-4">
+                                                            <button
+                                                                onClick={() => deleteSale(s.docId)}
+                                                                className="text-red-600 hover:text-red-800"
+                                                            >
+                                                                <Trash2 />
+                                                            </button>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Витрати */}
+                        {activeTab === 'expenses' && canViewFinances() && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-bold">Витрати</h2>
+
+                                {canEdit() && (
+                                    <div className="bg-white p-6 rounded-lg shadow">
+                                        <h3 className="text-lg font-bold mb-4">Додати витрату</h3>
+                                        <form onSubmit={addExpense} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                            <input
+                                                type="date"
+                                                name="expenseDate"
+                                                defaultValue={new Date().toISOString().split('T')[0]}
+                                                required
+                                                className="border rounded px-3 py-2"
+                                            />
+                                            <select name="category" required className="border rounded px-3 py-2">
+                                                <option value="Сировина">Сировина</option>
+                                                <option value="Зарплата">Зарплата</option>
+                                                <option value="Електроенергія">Електроенергія</option>
+                                                <option value="Обладнання">Обладнання</option>
+                                                <option value="Транспорт">Транспорт</option>
+                                                <option value="Інше">Інше</option>
+                                            </select>
+                                            <input
+                                                type="text"
+                                                name="description"
+                                                placeholder="Опис"
+                                                required
+                                                className="border rounded px-3 py-2"
+                                            />
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                name="amount"
+                                                placeholder="Сума"
+                                                required
+                                                className="border rounded px-3 py-2"
+                                            />
+                                            <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 md:col-span-4">
+                                                Додати витрату
+                                            </button>
+                                        </form>
+                                    </div>
+                                )}
+
+                                <div className="bg-white rounded-lg shadow overflow-hidden">
+                                    <table className="w-full">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Дата</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Категорія</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Опис</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Сума</th>
+                                                {canEdit() && (
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Дії</th>
+                                                )}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {expenses.map(e => (
+                                                <tr key={e.docId}>
+                                                    <td className="px-6 py-4">{e.date}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
+                                                            {e.category}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4">{e.description}</td>
+                                                    <td className="px-6 py-4 font-bold text-red-600">{e.amount.toFixed(2)} ₴</td>
+                                                    {canEdit() && (
+                                                        <td className="px-6 py-4">
+                                                            <button
+                                                                onClick={() => deleteExpense(e.docId)}
+                                                                className="text-red-600 hover:text-red-800"
+                                                            >
+                                                                <Trash2 />
+                                                            </button>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Користувачі (тільки для адміна) */}
+                        {activeTab === 'users' && userRole === 'admin' && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-bold">Управління користувачами</h2>
+
+                                <div className="bg-white rounded-lg shadow overflow-hidden">
+                                    <table className="w-full">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Роль</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {users.map(u => (
+                                                <tr key={u.uid}>
+                                                    <td className="px-6 py-4">{u.email}</td>
+                                                    <td className="px-6 py-4">
+                                                        <select 
+                                                            value={u.role}
+                                                            onChange={(e) => {
+                                                                db.collection('users').doc(u.uid).update({ role: e.target.value });
+                                                            }}
+                                                            className="border rounded px-2 py-1"
+                                                        >
+                                                            <option value="admin">Адміністратор</option>
+                                                            <option value="manager">Менеджер</option>
+                                                            <option value="worker">Працівник</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">
+                                                            Активний
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <p className="text-blue-800 font-medium">Як додати нового користувача:</p>
+                                    <p className="text-blue-700 text-sm mt-2">
+                                        1. Перейдіть у Firebase Console → Authentication<br/>
+                                        2. Натисніть "Add user" та введіть email і пароль<br/>
+                                        3. Після створення, додайте роль у Firestore → users → [uid користувача] → role: "worker/manager/admin"
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<CinderBlockProduction />, document.getElementById('root'));
+    </script>
+</body>
+</html>
